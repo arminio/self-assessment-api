@@ -25,6 +25,7 @@ import uk.gov.hmrc.play.test.UnitSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.control.NonFatal
 
 class HttpErrorMeterSpec extends UnitSpec {
 
@@ -71,7 +72,7 @@ class HttpErrorMeterSpec extends UnitSpec {
             Future.failed(Upstream4xxResponse("foobar", status, status))
           })
         } catch {
-          case ex: Throwable => ()
+          case NonFatal(_) => ()
         }
       }
       verify(errorMeter4xx, Mockito.times(3)).mark()
@@ -97,7 +98,7 @@ class HttpErrorMeterSpec extends UnitSpec {
             Future.failed(Upstream5xxResponse("foobar", status, status))
           })
         } catch {
-          case ex: Throwable => ()
+          case NonFatal(_) => ()
         }
       }
       verify(errorMeter5xx, Mockito.times(2)).mark()
@@ -112,21 +113,21 @@ class HttpErrorMeterSpec extends UnitSpec {
             Future.failed(new HttpException("foobar", status))
           })
         } catch {
-          case ex: Throwable => ()
+          case NonFatal(_) => ()
         }
       }
       verify(errorMeter5xx, Mockito.times(2)).mark()
     }
   }
 
-  "Any Throwable" should {
+  "Any NonFatal exception" should {
     "also be counted" in new HttpErrorRateMeterTest {
       try {
         await(countErrors("servicename") {
           Future.failed(new RuntimeException("foobar"))
         })
       } catch {
-        case ex: Throwable => ()
+        case NonFatal(_) => ()
       }
       verify(errorMeter5xx, Mockito.times(1)).mark()
     }
@@ -135,8 +136,8 @@ class HttpErrorMeterSpec extends UnitSpec {
 }
 
 class HttpErrorRateMeterTest extends HttpErrorRateMeter with MockedKenshooRegistry {
-  val errorMeter4xx = mock[Meter]
-  val errorMeter5xx = mock[Meter]
+  val errorMeter4xx: Meter = mock[Meter]
+  val errorMeter5xx: Meter = mock[Meter]
   given(registry.meter("Http4xxErrorCount-servicename")).willReturn(errorMeter4xx)
   given(registry.meter("Http5xxErrorCount-servicename")).willReturn(errorMeter5xx)
 }

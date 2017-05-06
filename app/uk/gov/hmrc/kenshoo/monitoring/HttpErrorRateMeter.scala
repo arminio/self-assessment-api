@@ -19,6 +19,7 @@ package uk.gov.hmrc.kenshoo.monitoring
 import play.api.Logger
 import uk.gov.hmrc.play.http.HeaderCarrier
 import uk.gov.hmrc.play.http.{HttpException, HttpResponse, Upstream4xxResponse, Upstream5xxResponse}
+import scala.util.control.NonFatal
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -34,7 +35,7 @@ trait HttpErrorRateMeter extends KenshooMetric {
       case Failure(exception: Upstream5xxResponse) => record(meterName(serviceName, exception.upstreamResponseCode))
       case Failure(exception: Upstream4xxResponse) => record(meterName(serviceName, exception.upstreamResponseCode))
       case Failure(exception: HttpException) => record(meterName(serviceName, exception.responseCode))
-      case Failure(exception: Throwable) => record(meterName(serviceName, 500))
+      case Failure(NonFatal(_)) => record(meterName(serviceName, 500))
     }
   }
 
