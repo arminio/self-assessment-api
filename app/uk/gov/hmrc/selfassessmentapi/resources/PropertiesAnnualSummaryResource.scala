@@ -23,6 +23,7 @@ import uk.gov.hmrc.play.http.HeaderCarrier
 import uk.gov.hmrc.selfassessmentapi.connectors.PropertiesAnnualSummaryConnector
 import uk.gov.hmrc.selfassessmentapi.contexts.AuthContext
 import uk.gov.hmrc.selfassessmentapi.models.Errors.Error
+import uk.gov.hmrc.selfassessmentapi.models.SourceType.SourceType
 import uk.gov.hmrc.selfassessmentapi.models.audit.AnnualSummaryUpdate
 import uk.gov.hmrc.selfassessmentapi.models.properties.PropertyType.PropertyType
 import uk.gov.hmrc.selfassessmentapi.models.properties.{FHLPropertiesAnnualSummary, OtherPropertiesAnnualSummary, PropertiesAnnualSummary, PropertyType}
@@ -33,7 +34,7 @@ import uk.gov.hmrc.selfassessmentapi.services.AuditService
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-object PropertiesAnnualSummaryResource extends BaseResource {
+object PropertiesAnnualSummaryResource extends Actions {
   private val connector = PropertiesAnnualSummaryConnector
 
   def updateAnnualSummary(nino: Nino, propertyId: PropertyType, taxYear: TaxYear): Action[JsValue] =
@@ -88,4 +89,6 @@ object PropertiesAnnualSummaryResource extends BaseResource {
     AuditService.audit(AnnualSummaryUpdate(nino, id.toString, taxYear, authCtx.toString, response.transactionReference, request.body),
                        s"$id-property-annual-summary-update")
   }
+
+  override val sourceType: SourceType = SourceType.Properties
 }

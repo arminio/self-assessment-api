@@ -23,6 +23,7 @@ import uk.gov.hmrc.play.http.HeaderCarrier
 import uk.gov.hmrc.selfassessmentapi.connectors.PropertiesPeriodConnector
 import uk.gov.hmrc.selfassessmentapi.contexts.AuthContext
 import uk.gov.hmrc.selfassessmentapi.models.Errors.Error
+import uk.gov.hmrc.selfassessmentapi.models.SourceType.SourceType
 import uk.gov.hmrc.selfassessmentapi.models._
 import uk.gov.hmrc.selfassessmentapi.models.audit.PeriodicUpdate
 import uk.gov.hmrc.selfassessmentapi.models.properties.PropertyType.PropertyType
@@ -33,7 +34,7 @@ import uk.gov.hmrc.selfassessmentapi.services.AuditService
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-object PropertiesPeriodResource extends BaseResource {
+object PropertiesPeriodResource extends Actions {
   private val connector = PropertiesPeriodConnector
 
   def createPeriod(nino: Nino, id: PropertyType): Action[JsValue] =
@@ -160,4 +161,6 @@ object PropertiesPeriodResource extends BaseResource {
                          PeriodicUpdate(nino, id.toString, periodId, authCtx.toString, response.transactionReference, request.body),
                        s"$id-property-periodic-create")
   }
+
+  override val sourceType: SourceType = SourceType.Properties
 }

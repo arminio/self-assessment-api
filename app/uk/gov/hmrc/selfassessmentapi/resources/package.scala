@@ -27,6 +27,8 @@ import scala.concurrent.Future
 
 package object resources {
 
+  type NoArgs = Unit
+
   val GovTestScenarioHeader = "Gov-Test-Scenario"
 
   def unhandledResponse(status: Int, logger: Logger): Result = {

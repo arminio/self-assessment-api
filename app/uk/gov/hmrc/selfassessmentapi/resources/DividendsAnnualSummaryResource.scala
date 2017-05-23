@@ -20,13 +20,14 @@ import play.api.libs.json.{JsValue, Json}
 import play.api.mvc.{Action, AnyContent}
 import uk.gov.hmrc.domain.Nino
 import uk.gov.hmrc.selfassessmentapi.contexts.FilingOnlyAgent
+import uk.gov.hmrc.selfassessmentapi.models.SourceType.SourceType
 import uk.gov.hmrc.selfassessmentapi.models.dividends.Dividends
 import uk.gov.hmrc.selfassessmentapi.models.{Errors, SourceType, TaxYear}
 import uk.gov.hmrc.selfassessmentapi.services.DividendsAnnualSummaryService
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object DividendsAnnualSummaryResource extends BaseResource {
+object DividendsAnnualSummaryResource extends Actions {
 
   private val service = DividendsAnnualSummaryService
 
@@ -49,4 +50,6 @@ object DividendsAnnualSummaryResource extends BaseResource {
         case _ => NotFound
       }
     }
+
+  override val sourceType: SourceType = SourceType.Dividends
 }

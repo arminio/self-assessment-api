@@ -21,6 +21,7 @@ import play.api.mvc.{Action, Request}
 import uk.gov.hmrc.domain.Nino
 import uk.gov.hmrc.play.http.HeaderCarrier
 import uk.gov.hmrc.selfassessmentapi.connectors.TaxCalculationConnector
+import uk.gov.hmrc.selfassessmentapi.models.SourceType.SourceType
 import uk.gov.hmrc.selfassessmentapi.contexts.AuthContext
 import uk.gov.hmrc.selfassessmentapi.models.audit.{TaxCalculationRequest, TaxCalculationTrigger}
 import uk.gov.hmrc.selfassessmentapi.models.calculation.CalculationRequest
@@ -30,7 +31,7 @@ import uk.gov.hmrc.selfassessmentapi.services.AuditService
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object TaxCalculationResource extends BaseResource {
+object TaxCalculationResource extends Actions {
   private val connector = TaxCalculationConnector
 
   private val cannedEtaResponse =
@@ -98,4 +99,6 @@ object TaxCalculationResource extends BaseResource {
         authCtx.toString,
         response.json), "retrieve-tax-calculation")
   }
+
+  override val sourceType: SourceType = SourceType.Calculation
 }

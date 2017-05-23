@@ -21,12 +21,13 @@ import play.api.mvc.{Action, AnyContent}
 import uk.gov.hmrc.domain.Nino
 import uk.gov.hmrc.selfassessmentapi.connectors.PropertiesConnector
 import uk.gov.hmrc.selfassessmentapi.models.Errors._
+import uk.gov.hmrc.selfassessmentapi.models.SourceType.SourceType
 import uk.gov.hmrc.selfassessmentapi.models._
 import uk.gov.hmrc.selfassessmentapi.resources.wrappers.PropertiesResponse
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object PropertiesResource extends BaseResource {
+object PropertiesResource extends Actions {
   private val connector = PropertiesConnector
 
   def create(nino: Nino): Action[JsValue] =
@@ -62,4 +63,6 @@ object PropertiesResource extends BaseResource {
         }
       }
     }
+
+  override val sourceType: SourceType = SourceType.Properties
 }

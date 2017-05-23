@@ -19,6 +19,7 @@ package uk.gov.hmrc.selfassessmentapi.resources
 import play.api.libs.json.{JsValue, Json}
 import play.api.mvc._
 import uk.gov.hmrc.domain.Nino
+import uk.gov.hmrc.selfassessmentapi.models.SourceType.SourceType
 import uk.gov.hmrc.selfassessmentapi.contexts.FilingOnlyAgent
 import uk.gov.hmrc.selfassessmentapi.models.banks.BankAnnualSummary
 import uk.gov.hmrc.selfassessmentapi.models.{Errors, SourceId, SourceType, TaxYear}
@@ -26,7 +27,7 @@ import uk.gov.hmrc.selfassessmentapi.services.BanksAnnualSummaryService
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object BanksAnnualSummaryResource extends BaseResource {
+object BanksAnnualSummaryResource extends Actions {
   private val annualSummaryService = BanksAnnualSummaryService
 
   def updateAnnualSummary(nino: Nino, id: SourceId, taxYear: TaxYear): Action[JsValue] =
@@ -49,4 +50,6 @@ object BanksAnnualSummaryResource extends BaseResource {
         case None => NotFound
       }
     }
+
+  override val sourceType: SourceType = SourceType.Banks
 }

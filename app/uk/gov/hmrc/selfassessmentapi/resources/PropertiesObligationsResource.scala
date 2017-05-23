@@ -20,11 +20,12 @@ import play.api.libs.json.Json
 import play.api.mvc.Action
 import uk.gov.hmrc.domain.Nino
 import uk.gov.hmrc.selfassessmentapi.connectors.ObligationsConnector
+import uk.gov.hmrc.selfassessmentapi.models.SourceType.SourceType
 import uk.gov.hmrc.selfassessmentapi.models.{Errors, SourceType}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object PropertiesObligationsResource extends BaseResource {
+object PropertiesObligationsResource extends Actions {
   private val connector = ObligationsConnector
 
   def retrieveObligations(nino: Nino): Action[Unit] =
@@ -40,4 +41,6 @@ object PropertiesObligationsResource extends BaseResource {
         }
       }
     }
+
+  override val sourceType: SourceType = SourceType.Properties
 }

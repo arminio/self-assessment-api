@@ -29,6 +29,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 trait BaseResource extends BaseController {
+
+  protected lazy val baseUrl: String = AppContext.desUrl
+
+  val sourceType: SourceType
+  val summary = None
+
   val logger: Logger = Logger(this.getClass)
 
   private val authService = AuthenticationService

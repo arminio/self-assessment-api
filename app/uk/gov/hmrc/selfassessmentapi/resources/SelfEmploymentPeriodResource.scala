@@ -23,6 +23,7 @@ import uk.gov.hmrc.play.http.HeaderCarrier
 import uk.gov.hmrc.selfassessmentapi.connectors.SelfEmploymentPeriodConnector
 import uk.gov.hmrc.selfassessmentapi.contexts.AuthContext
 import uk.gov.hmrc.selfassessmentapi.models.Errors.Error
+import uk.gov.hmrc.selfassessmentapi.models.SourceType.SourceType
 import uk.gov.hmrc.selfassessmentapi.models._
 import uk.gov.hmrc.selfassessmentapi.models.audit.PeriodicUpdate
 import uk.gov.hmrc.selfassessmentapi.models.selfemployment.{SelfEmploymentPeriod, SelfEmploymentPeriodUpdate}
@@ -32,7 +33,7 @@ import uk.gov.hmrc.selfassessmentapi.services.AuditService
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-object SelfEmploymentPeriodResource extends BaseResource {
+object SelfEmploymentPeriodResource extends Actions {
   private val connector = SelfEmploymentPeriodConnector
 
   def createPeriod(nino: Nino, sourceId: SourceId): Action[JsValue] =
@@ -115,4 +116,6 @@ object SelfEmploymentPeriodResource extends BaseResource {
     AuditService.audit(payload = PeriodicUpdate(nino, id, periodId, authCtx.toString, response.transactionReference, request.body),
                        "self-employment-periodic-create")
   }
+
+  override val sourceType: SourceType = SourceType.SelfEmployments
 }

@@ -23,6 +23,7 @@ import uk.gov.hmrc.play.http.HeaderCarrier
 import uk.gov.hmrc.selfassessmentapi.connectors.SelfEmploymentAnnualSummaryConnector
 import uk.gov.hmrc.selfassessmentapi.contexts.AuthContext
 import uk.gov.hmrc.selfassessmentapi.models.Errors.Error
+import uk.gov.hmrc.selfassessmentapi.models.SourceType.SourceType
 import uk.gov.hmrc.selfassessmentapi.models._
 import uk.gov.hmrc.selfassessmentapi.models.audit.AnnualSummaryUpdate
 import uk.gov.hmrc.selfassessmentapi.models.selfemployment.SelfEmploymentAnnualSummary
@@ -31,7 +32,7 @@ import uk.gov.hmrc.selfassessmentapi.services.AuditService
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object SelfEmploymentAnnualSummaryResource extends BaseResource {
+object SelfEmploymentAnnualSummaryResource extends Actions {
   private val connector = SelfEmploymentAnnualSummaryConnector
 
   def updateAnnualSummary(nino: Nino, id: SourceId, taxYear: TaxYear): Action[JsValue] =
@@ -72,4 +73,6 @@ object SelfEmploymentAnnualSummaryResource extends BaseResource {
     AuditService.audit(AnnualSummaryUpdate(nino, id, taxYear, authCtx.toString, response.transactionReference, request.body),
                        "self-employment-annual-summary-update")
   }
+
+  override val sourceType: SourceType = SourceType.SelfEmployments
 }

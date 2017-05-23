@@ -17,25 +17,22 @@
 package uk.gov.hmrc.selfassessmentapi.models.des
 
 import play.api.libs.json.{Json, Writes}
-import uk.gov.hmrc.selfassessmentapi.models
+import uk.gov.hmrc.selfassessmentapi.models.{From, selfemployment}
 
 case class SelfEmploymentUpdate(tradingName: String, typeOfBusiness: String, addressDetails: SelfEmploymentAddress)
 
 object SelfEmploymentUpdate {
   implicit val writes: Writes[SelfEmploymentUpdate] = Json.writes[SelfEmploymentUpdate]
 
-  def from(apiSelfEmployment: models.selfemployment.SelfEmploymentUpdate): SelfEmploymentUpdate = {
-    SelfEmploymentUpdate(
-      tradingName = apiSelfEmployment.tradingName,
-      typeOfBusiness = apiSelfEmployment.businessDescription,
-      addressDetails = SelfEmploymentAddress(
-        addressLine1 = apiSelfEmployment.businessAddressLineOne,
-        addressLine2 = apiSelfEmployment.businessAddressLineTwo,
-        addressLine3 = apiSelfEmployment.businessAddressLineThree,
-        addressLine4 = apiSelfEmployment.businessAddressLineFour,
-        postalCode = Some(apiSelfEmployment.businessPostcode)
-      )
-    )
+  implicit val from = new From[selfemployment.SelfEmploymentUpdate, SelfEmploymentUpdate] {
+    override def from(apiSelfEmployment: selfemployment.SelfEmploymentUpdate): SelfEmploymentUpdate =
+      SelfEmploymentUpdate(tradingName = apiSelfEmployment.tradingName,
+                           typeOfBusiness = apiSelfEmployment.businessDescription,
+                           addressDetails =
+                             SelfEmploymentAddress(addressLine1 = apiSelfEmployment.businessAddressLineOne,
+                                                   addressLine2 = apiSelfEmployment.businessAddressLineTwo,
+                                                   addressLine3 = apiSelfEmployment.businessAddressLineThree,
+                                                   addressLine4 = apiSelfEmployment.businessAddressLineFour,
+                                                   postalCode = Some(apiSelfEmployment.businessPostcode)))
   }
-
 }
