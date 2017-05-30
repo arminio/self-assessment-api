@@ -19,10 +19,10 @@ package uk.gov.hmrc.selfassessmentapi.models
 /*
   Typeclass to transform a model from A to B
  */
-trait From[-A, B] {
+trait Transform[-A, +B] {
   def from(a: A): B
 }
 
-object From {
-  def apply[A, B](implicit ev: From[A, B]): From[A, B] = implicitly
+object Transform {
+  def apply[A, B](implicit ev: Transform[A, B]): Transform[A, B] = implicitly
 }

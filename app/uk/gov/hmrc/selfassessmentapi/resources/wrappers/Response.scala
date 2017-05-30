@@ -26,6 +26,7 @@ import uk.gov.hmrc.selfassessmentapi.models.Errors
 import uk.gov.hmrc.selfassessmentapi.resources.AuthRequest
 
 trait Response {
+
   val logger: Logger = Logger(this.getClass)
 
   def underlying: HttpResponse
@@ -37,6 +38,9 @@ trait Response {
   private def logResponse(): Unit =
     logger.error(s"DES error occurred with status code ${underlying.status} and body ${underlying.body}")
 
+  @deprecated(
+    message = "This will potentially need to be redesigned so that http status codes returned to TPVs " +
+      "are driven by des error codes and not by http status codes returned by the DES")
   def filter[A](f: Int => Result)(implicit request: AuthRequest[A]): Result =
     status / 100 match {
       case 4 if request.authContext == FilingOnlyAgent =>
@@ -47,4 +51,38 @@ trait Response {
         f(status)
       case _ => f(status)
     }
+}
+
+object Response {
+  def unapply(arg: Response): Option[Int] = Some(arg.status)
+}
+
+trait ResponseHandler[R <: Response] {
+
+  @deprecated(
+    message = "This will potentially need to be redesigned so that http status codes returned to TPVs " +
+      "are driven by des error codes and not by http status codes returned by the DES")
+  def filter[A](response: R)(implicit request: AuthRequest[A]): PartialFunction[R, Either[Result, R]] =
+    response.status / 100 match {
+      case 4 if request.authContext == FilingOnlyAgent =>
+        log(response)
+        locally { case _ => Left(BadRequest(Json.toJson(Errors.InvalidRequest))) }
+      case 4 | 5 =>
+        log(response)
+        locally { case _ => Right(response) }
+      case _ => { case _ => Right(response) }
+    }
+
+  def handle[A](response: R, responseMapper: PartialFunction[R, Result])(implicit request: AuthRequest[A]): Result =
+    (filter(response) andThen (_.right.map(responseMapper orElse unhandledResponse).merge))(response)
+
+  private def unhandledResponse: PartialFunction[R, Result] = {
+    case response =>
+      response.logger.warn(s"Unhandled response from DES. Status code: ${response.status}. Returning 500 to client.")
+      InternalServerError(Json.toJson(Errors.InternalServerError))
+  }
+
+  private def log(response: R): Unit =
+    response.logger.error(
+      s"DES error occurred with status code ${response.underlying.status} and body ${response.underlying.body}")
 }

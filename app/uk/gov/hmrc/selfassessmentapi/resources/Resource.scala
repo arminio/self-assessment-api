@@ -16,98 +16,123 @@
 
 package uk.gov.hmrc.selfassessmentapi.resources
 
-import play.api.libs.json.{JsValue, Reads}
+import cats.data.Reader
+import play.api.libs.json.{JsValue, Reads, Writes}
 import play.api.mvc.{Action, Result}
 import uk.gov.hmrc.domain.Nino
-import uk.gov.hmrc.play.http.HeaderCarrier
-import uk.gov.hmrc.selfassessmentapi.models.From
+import uk.gov.hmrc.selfassessmentapi.connectors.{Connector, Verb}
+import uk.gov.hmrc.selfassessmentapi.models.Transform
 import uk.gov.hmrc.selfassessmentapi.resources.wrappers.{Response, ResponseHandler}
 
 import scala.concurrent.ExecutionContext.Implicits._
-import scala.concurrent.Future
 
-trait Get[R <: Response] extends Actions with ResponseHandler[R] {
-  type Args
+object Resource {
+  trait Read[R <: Response, V <: Verb] extends Actions2 with ResponseHandler[R] {
+    type Args
 
-  def get(nino: Nino, args: Args): Action[Unit] =
-    APIAction(nino, sourceType, summary).async(parse.empty) { implicit request =>
-      httpGet(nino, args) map (handle(_, responseMapper(nino, args)))
-    }
+    def httpRead(
+        nino: Nino,
+        args: Args,
+        responseMapper: (Nino, Args) => PartialFunction[R, Result]): Reader[Config[R, V, Args], Action[Unit]] =
+      Reader(config =>
+        APIAction(nino, sourceType, summary).run(config.actionConfig).async(parse.empty) { implicit request =>
+          config.connector
+            .httpGet(nino, args) map (_ map (handle(_, responseMapper(nino, args)))) run config.connector.config
+      })
+  }
 
-  def httpGet(nino: Nino, args: Args)(implicit hc: HeaderCarrier): Future[R]
+  trait Write[R <: Response, V <: Verb, A, D] extends Actions2 with ResponseHandler[R] {
+    type Args
 
-  def responseMapper(nino: Nino, args: Args): PartialFunction[R, Result]
-}
+    def httpWrite(v: V, nino: Nino, args: Args, responseMapper: (Nino, Args) => PartialFunction[R, Result])(
+        implicit Reads: Reads[A],
+        Writes: Writes[D],
+        Transform: Transform[A, D]): Reader[Config[R, V, Args], Action[JsValue]] =
+      Reader(config =>
+        APIAction(nino, sourceType, summary).run(config.actionConfig).async(parse.json) { implicit request =>
+          validate[A, R](request.body) { validatedRequest =>
+            v match {
+              case _: Verb.Post.type =>
+                config.connector.httpPost(nino, Transform.from(validatedRequest), args) run config.connector.config
+              case _: Verb.Put.type =>
+                config.connector.httpPut(nino, Transform.from(validatedRequest), args) run config.connector.config
+            }
+          } map {
+            case Left(errorResult) => handleValidationErrors(errorResult)
+            case Right(response) => handle(response, responseMapper(nino, args))
+          }
+      })
+  }
 
-object Get {
-  type Aux[R <: Response, A] = Get[R] { type Args = A }
-  def apply[R <: Response, A](implicit ev: Aux[R, A]): Aux[R, A] = implicitly
-}
+  trait Get[R <: Response] extends Read[R, Verb.Get.type] {
+    type Args
 
-trait List[R <: Response] extends Actions with ResponseHandler[R] {
-  def list(nino: Nino): Action[Unit] =
-    APIAction(nino, sourceType, summary).async(parse.empty) { implicit request =>
-      httpList(nino) map (handle(_, responseMapper(nino)))
-    }
+    def get(nino: Nino, args: Args): Reader[Config[R, Verb.Get.type, Args], Action[Unit]] =
+      httpRead(nino, args, responseMapper)
 
-  def httpList(nino: Nino)(implicit hc: HeaderCarrier): Future[R]
+    def responseMapper(nino: Nino, args: Args): PartialFunction[R, Result]
+  }
 
-  def responseMapper(nino: Nino): PartialFunction[R, Result]
-}
+  object Get {
+    type Aux[R <: Response, A] = Get[R] { type Args = A }
 
-object List {
-  def apply[R <: Response](implicit l: List[R]): List[R] = implicitly
-}
+    def apply[R <: Response, A](implicit ev: Aux[R, A]): Aux[R, A] = implicitly
+  }
 
-/**
-  * Typeclass that represents a Play Action to POST a request to DES
-  *
-  * @tparam A API model
-  * @tparam D DES model
-  * @tparam R DES HTTP response wrapper
-  */
-trait Post[A, D, R <: Response] extends Actions with ResponseHandler[R] {
-  type Args
+  trait List[R <: Response] extends Read[R, Verb.List.type] {
+    type Args = Unit
+    def list(nino: Nino): Reader[Config[R, Verb.List.type, Args], Action[Unit]] =
+      httpRead(nino, (), responseMapper)
 
-  def post(nino: Nino, args: Args)(implicit reads: Reads[A], from: From[A, D]): Action[JsValue] =
-    APIAction(nino, sourceType, summary).async(parse.json) { implicit request =>
-      validate[A, R](request.body) { validatedRequest =>
-        httpPost(nino, From[A, D].from(validatedRequest), args)
-      } map {
-        case Left(errorResult) => handleValidationErrors(errorResult)
-        case Right(response) => handle(response, responseMapper(nino, args))
-      }
-    }
+    def responseMapper(nino: Nino, args: Unit): PartialFunction[R, Result]
+  }
 
-  def httpPost(nino: Nino, desRequest: D, args: Args)(implicit hc: HeaderCarrier): Future[R]
+  object List {
+    def apply[R <: Response](implicit l: List[R]): List[R] = implicitly
+  }
 
-  def responseMapper(nino: Nino, args: Args): PartialFunction[R, Result]
-}
+  /**
+    * Typeclass that represents a Play Action to POST a request to DES
+    *
+    * @tparam A API model
+    * @tparam D DES model
+    * @tparam R DES HTTP response wrapper
+    */
+  trait Post[A, D, R <: Response] extends Write[R, Verb.Post.type, A, D] {
+    type Args
 
-object Post {
-  type Aux[A, D, R <: Response, G] = Post[A, D, R] { type Args = G }
-  def apply[A, D, R <: Response, G](implicit ev: Aux[A, D, R, G]): Aux[A, D, R, G] = implicitly
-}
+    def post(nino: Nino, args: Args)(
+        implicit Reads: Reads[A],
+        Writes: Writes[D],
+        Transform: Transform[A, D]): Reader[Config[R, Verb.Post.type, Args], Action[JsValue]] =
+      httpWrite(Verb.Post, nino, args, responseMapper)
 
-trait Put[A, D, R <: Response] extends Actions with ResponseHandler[R] {
-  type Args
+    def responseMapper(nino: Nino, args: Args): PartialFunction[R, Result]
+  }
 
-  def put(nino: Nino, args: Args)(implicit reads: Reads[A], from: From[A, D]): Action[JsValue] =
-    APIAction(nino, sourceType, summary).async(parse.json) { implicit request =>
-      validate[A, R](request.body) { validatedRequest =>
-        httpPut(nino, From[A, D].from(validatedRequest), args)
-      } map {
-        case Left(errorResult) => handleValidationErrors(errorResult)
-        case Right(response) => handle(response, responseMapper(nino, args))
-      }
-    }
+  object Post {
+    type Aux[A, D, R <: Response, G] = Post[A, D, R] { type Args = G }
 
-  def httpPut(nino: Nino, desRequest: D, args: Args)(implicit hc: HeaderCarrier): Future[R]
+    def apply[A, D, R <: Response, G](implicit ev: Aux[A, D, R, G]): Aux[A, D, R, G] = implicitly
+  }
 
-  def responseMapper(nino: Nino, args: Args): PartialFunction[R, Result]
-}
+  trait Put[A, D, R <: Response] extends Write[R, Verb.Put.type, A, D] {
+    type Args
 
-object Put {
-  type Aux[A, D, R <: Response, G] = Put[A, D, R] { type Args = G }
-  def apply[A, D, R <: Response, G](implicit ev: Aux[A, D, R, G]): Aux[A, D, R, G] = implicitly
+    def put(nino: Nino, args: Args)(
+        implicit Reads: Reads[A],
+        Writes: Writes[D],
+        Transform: Transform[A, D]): Reader[Config[R, Verb.Put.type, Args], Action[JsValue]] =
+      httpWrite(Verb.Put, nino, args, responseMapper)
+
+    def responseMapper(nino: Nino, args: Args): PartialFunction[R, Result]
+  }
+
+  object Put {
+    type Aux[A, D, R <: Response, G] = Put[A, D, R] { type Args = G }
+
+    def apply[A, D, R <: Response, G](implicit ev: Aux[A, D, R, G]): Aux[A, D, R, G] = implicitly
+  }
+
+  case class Config[R <: Response, V <: Verb, A](actionConfig: ActionConfig, connector: Connector.Aux[R, V, A])
 }

@@ -17,14 +17,14 @@
 package uk.gov.hmrc.selfassessmentapi.models.des
 
 import play.api.libs.json.{Json, Writes}
-import uk.gov.hmrc.selfassessmentapi.models.{From, selfemployment}
+import uk.gov.hmrc.selfassessmentapi.models.{Transform, selfemployment}
 
 case class SelfEmploymentUpdate(tradingName: String, typeOfBusiness: String, addressDetails: SelfEmploymentAddress)
 
 object SelfEmploymentUpdate {
   implicit val writes: Writes[SelfEmploymentUpdate] = Json.writes[SelfEmploymentUpdate]
 
-  implicit val from = new From[selfemployment.SelfEmploymentUpdate, SelfEmploymentUpdate] {
+  implicit val from = new Transform[selfemployment.SelfEmploymentUpdate, SelfEmploymentUpdate] {
     override def from(apiSelfEmployment: selfemployment.SelfEmploymentUpdate): SelfEmploymentUpdate =
       SelfEmploymentUpdate(tradingName = apiSelfEmployment.tradingName,
                            typeOfBusiness = apiSelfEmployment.businessDescription,

@@ -17,31 +17,42 @@
 package uk.gov.hmrc.selfassessmentapi.connectors
 
 import uk.gov.hmrc.domain.Nino
-import uk.gov.hmrc.play.http.HeaderCarrier
-import uk.gov.hmrc.selfassessmentapi.config.AppContext
 import uk.gov.hmrc.selfassessmentapi.models.SourceId
-import uk.gov.hmrc.selfassessmentapi.models.des.{Business, SelfEmploymentUpdate}
 import uk.gov.hmrc.selfassessmentapi.resources.wrappers.SelfEmploymentResponse
-
-import scala.concurrent.Future
 
 object SelfEmploymentConnector {
 
-  private lazy val baseUrl: String = AppContext.desUrl
+  lazy val httpConnector: HttpConnector = HttpConnector()
 
-  def create(nino: Nino, business: Business)(implicit hc: HeaderCarrier): Future[SelfEmploymentResponse] =
-    httpPost[Business, SelfEmploymentResponse](baseUrl + s"/income-tax-self-assessment/nino/$nino/business",
-                                               business,
-                                               SelfEmploymentResponse)
+  implicit val getConn = new Connector[SelfEmploymentResponse, Verb.Get.type] { self =>
+    override type Args = SourceId
 
-  def get(nino: Nino)(implicit hc: HeaderCarrier): Future[SelfEmploymentResponse] =
-    httpGet[SelfEmploymentResponse](baseUrl + s"/registration/business-details/nino/$nino",
-                                    SelfEmploymentResponse)
+    def mkUrl(nino: Nino, args: Args): String = baseUrl + s"/registration/business-details/nino/$nino"
 
-  def update(nino: Nino, business: SelfEmploymentUpdate, id: SourceId)(
-      implicit hc: HeaderCarrier): Future[SelfEmploymentResponse] =
-    httpPut[SelfEmploymentUpdate, SelfEmploymentResponse](
-      baseUrl + s"/income-tax-self-assessment/nino/$nino/business/$id",
-      business,
-      SelfEmploymentResponse)
+    override def config = Config(url = mkUrl, toResponse = SelfEmploymentResponse, httpConnector = httpConnector)
+  }
+
+  implicit val listConn = new Connector[SelfEmploymentResponse, Verb.List.type] { self =>
+    override type Args = Unit
+
+    def mkUrl(nino: Nino, args: Args): String = baseUrl + s"/registration/business-details/nino/$nino"
+
+    override def config = Config(url = mkUrl, toResponse = SelfEmploymentResponse, httpConnector = httpConnector)
+  }
+
+  implicit val postConn = new Connector[SelfEmploymentResponse, Verb.Post.type] { self =>
+    override type Args = Unit
+
+    def mkUrl(nino: Nino, args: Args): String = baseUrl + s"/income-tax-self-assessment/nino/$nino/business"
+
+    override def config = Config(url = mkUrl, toResponse = SelfEmploymentResponse, httpConnector = httpConnector)
+  }
+
+  implicit val putConn = new Connector[SelfEmploymentResponse, Verb.Put.type] { self =>
+    override type Args = SourceId
+
+    def mkUrl(nino: Nino, args: Args): String = baseUrl + s"/income-tax-self-assessment/nino/$nino/business/$args"
+
+    override def config = Config(url = mkUrl, toResponse = SelfEmploymentResponse, httpConnector = httpConnector)
+  }
 }

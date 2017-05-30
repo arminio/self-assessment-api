@@ -18,6 +18,7 @@ package uk.gov.hmrc.selfassessmentapi.models
 
 import org.joda.time.LocalDate
 
+import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
 trait Period {
@@ -28,7 +29,7 @@ trait Period {
 }
 
 object Period {
-  val periodPattern = """(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})""".r
+  val periodPattern: Regex = """(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})""".r
 
   def apply(f: LocalDate, t:LocalDate) = new Period {
     override val from: LocalDate = f
@@ -45,4 +46,7 @@ object Period {
       case _ => None
     }
   }
+
+  def unapply(arg: Period): Option[(LocalDate, LocalDate)] =
+    unapply(arg.periodId)
 }

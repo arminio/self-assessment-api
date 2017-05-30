@@ -21,28 +21,31 @@ import play.api.libs.json.{JsArray, JsValue, Json, Writes}
 import play.api.mvc.Results._
 import play.api.mvc.{Action, Result}
 import uk.gov.hmrc.domain.Nino
-import uk.gov.hmrc.play.http.HeaderCarrier
-import uk.gov.hmrc.selfassessmentapi.connectors
+import uk.gov.hmrc.selfassessmentapi.config.AppContext
+import uk.gov.hmrc.selfassessmentapi.connectors.SelfEmploymentConnector.{getConn, listConn, postConn, putConn}
+import uk.gov.hmrc.selfassessmentapi.connectors.{Connector, Verb}
 import uk.gov.hmrc.selfassessmentapi.models.Errors.Error
 import uk.gov.hmrc.selfassessmentapi.models.SourceType.SourceType
 import uk.gov.hmrc.selfassessmentapi.models.des.Business
 import uk.gov.hmrc.selfassessmentapi.models.selfemployment.{SelfEmployment, SelfEmploymentUpdate}
 import uk.gov.hmrc.selfassessmentapi.models.{Errors, _}
-import uk.gov.hmrc.selfassessmentapi.resources.wrappers.{EmptyBusinessData, EmptySelfEmployments, ParseError, SelfEmploymentResponse, _}
-
-import scala.concurrent.Future
+import uk.gov.hmrc.selfassessmentapi.resources.Resource.{Config, Get, List, Post, Put}
+import uk.gov.hmrc.selfassessmentapi.resources.wrappers.{
+  EmptyBusinessData,
+  EmptySelfEmployments,
+  ParseError,
+  SelfEmploymentResponse,
+  _
+}
 
 object SelfEmploymentsResource {
+  lazy val baseUrl: String = AppContext.desUrl
+
   val logger: Logger = Logger(this.getClass)
 
   implicit val get = new Get[SelfEmploymentResponse] {
     override type Args = SourceId
-
     override val sourceType: SourceType = SourceType.SelfEmployments
-
-    override def httpGet(nino: Nino, args: Args)(implicit hc: HeaderCarrier): Future[SelfEmploymentResponse] =
-      connectors.httpGet[SelfEmploymentResponse](baseUrl + s"/registration/business-details/nino/$nino",
-                                                 SelfEmploymentResponse)
 
     override def responseMapper(nino: Nino, id: SourceId): PartialFunction[SelfEmploymentResponse, Result] = {
       case r @ Response(200) => handleRetrieve(r.selfEmployment(id), NotFound)
@@ -54,11 +57,7 @@ object SelfEmploymentsResource {
   implicit val list = new List[SelfEmploymentResponse] {
     override val sourceType: SourceType = SourceType.SelfEmployments
 
-    override def httpList(nino: Nino)(implicit hc: HeaderCarrier): Future[SelfEmploymentResponse] =
-      connectors.httpGet[SelfEmploymentResponse](baseUrl + s"/registration/business-details/nino/$nino",
-                                                 SelfEmploymentResponse)
-
-    override def responseMapper(nino: Nino): PartialFunction[SelfEmploymentResponse, Result] = {
+    override def responseMapper(nino: Nino, args: Unit): PartialFunction[SelfEmploymentResponse, Result] = {
       case r @ Response(200) => handleRetrieve(r.listSelfEmployment, Ok(JsArray()))
       case Response(400) => BadRequest(Json.toJson(Errors.NinoInvalid))
       case Response(404) => NotFound
@@ -67,14 +66,7 @@ object SelfEmploymentsResource {
 
   implicit val post = new Post[SelfEmployment, Business, SelfEmploymentResponse] {
     override val sourceType: SourceType = SourceType.SelfEmployments
-    override type Args = NoArgs
-
-    override def httpPost(nino: Nino, desRequest: Business, args: NoArgs)(
-        implicit hc: HeaderCarrier): Future[SelfEmploymentResponse] =
-      connectors.httpPost[Business, SelfEmploymentResponse](
-        baseUrl + s"/income-tax-self-assessment/nino/$nino/business",
-        desRequest,
-        SelfEmploymentResponse)
+    override type Args = Unit
 
     override def responseMapper(nino: Nino, args: Args): PartialFunction[SelfEmploymentResponse, Result] = {
       case r @ Response(200) => Created.withHeaders(LOCATION -> r.createLocationHeader(nino).getOrElse(""))
@@ -94,13 +86,6 @@ object SelfEmploymentsResource {
     override val sourceType: SourceType = SourceType.SelfEmployments
     override type Args = SourceId
 
-    override def httpPut(nino: Nino, desRequest: des.SelfEmploymentUpdate, id: Args)(
-        implicit hc: HeaderCarrier): Future[SelfEmploymentResponse] =
-      connectors.httpPut[des.SelfEmploymentUpdate, SelfEmploymentResponse](
-        baseUrl + s"/income-tax-self-assessment/nino/$nino/business/$id",
-        desRequest,
-        SelfEmploymentResponse)
-
     override def responseMapper(nino: Nino, args: Args): PartialFunction[SelfEmploymentResponse, Result] = {
       case Response(204) => NoContent
       case r @ Response(400) => BadRequest(Error.from(r.json))
@@ -108,18 +93,43 @@ object SelfEmploymentsResource {
     }
   }
 
-  def create(nino: Nino): Action[JsValue] =
-    Post[SelfEmployment, Business, SelfEmploymentResponse, NoArgs].post(nino, ())
+  def create(nino: Nino): Action[JsValue] = {
+    val action = Post[SelfEmployment, Business, SelfEmploymentResponse, Unit]
+    action
+      .post(nino, ())
+      .run(
+        Config(actionConfig = action.actionConfig, connector = Connector[SelfEmploymentResponse, Verb.Post.type, Unit])
+      )
+  }
 
   // TODO: DES spec for this method is currently unavailable. This method should be updated once it is available.
-  def update(nino: Nino, id: SourceId): Action[JsValue] =
-    Put[SelfEmploymentUpdate, des.SelfEmploymentUpdate, SelfEmploymentResponse, SourceId].put(nino, id)
+  def update(nino: Nino, id: SourceId): Action[JsValue] = {
+    val action = Put[SelfEmploymentUpdate, des.SelfEmploymentUpdate, SelfEmploymentResponse, SourceId]
+    action
+      .put(nino, id)
+      .run(
+        Config(actionConfig = action.actionConfig,
+               connector = Connector[SelfEmploymentResponse, Verb.Put.type, SourceId])
+      )
+  }
 
-  def retrieve(nino: Nino, id: SourceId): Action[Unit] =
-    Get[SelfEmploymentResponse, SourceId].get(nino, id)
+  def retrieve(nino: Nino, id: SourceId): Action[Unit] = {
+    val action = Get[SelfEmploymentResponse, SourceId]
+    action
+      .get(nino, id)
+      .run(
+        Config(actionConfig = action.actionConfig,
+               connector = Connector[SelfEmploymentResponse, Verb.Get.type, SourceId]))
+  }
 
-  def retrieveAll(nino: Nino): Action[Unit] =
-    List[SelfEmploymentResponse].list(nino)
+  def retrieveAll(nino: Nino): Action[Unit] = {
+    val action = List[SelfEmploymentResponse]
+    action
+      .list(nino)
+      .run(
+        Config(actionConfig = action.actionConfig,
+               connector = Connector[SelfEmploymentResponse, Verb.List.type, Unit]))
+  }
 
   private def handleRetrieve[T](selfEmployments: Either[SelfEmploymentRetrieveError, T], resultOnEmptyData: Result)(
       implicit w: Writes[T]): Result =

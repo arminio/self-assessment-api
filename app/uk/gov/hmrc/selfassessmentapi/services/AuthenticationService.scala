@@ -32,33 +32,29 @@ import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.matching.Regex
 
-object AuthenticationService extends AuthorisedFunctions {
+trait AuthenticationService extends AuthorisedFunctions {
   type AuthResult = Either[Result, AuthContext]
-
-  private val lookupService = MtdRefLookupService
 
   override def authConnector: AuthConnector = MicroserviceAuthConnector
 
-  private val logger = Logger(AuthenticationService.getClass)
-
   def authCheck(nino: Nino)(implicit hc: HeaderCarrier, reqHeader: RequestHeader): Future[AuthResult] =
-    lookupService.mtdReferenceFor(nino).flatMap {
+    MtdRefLookupService.mtdReferenceFor(nino).flatMap {
       case Some(id) => authoriseAsClient(id)
       case None => Future.successful(Left(Forbidden(Json.toJson(Errors.ClientNotSubscribed))))
     }
 
   private def authoriseAsClient(mtdId: MtdId)(implicit hc: HeaderCarrier,
                                               requestHeader: RequestHeader): Future[AuthResult] = {
-    logger.debug("Attempting to authorise user as a fully-authorised individual.")
+    Logger.debug("Attempting to authorise user as a fully-authorised individual.")
     authorised(
       Enrolment("HMRC-MTD-IT")
         .withIdentifier("MTDITID", mtdId.mtdId)
         .withDelegatedAuthRule("mtd-it-auth")).retrieve(Retrievals.affinityGroup) {
       case affinityGroup if affinityGroup.contains(AffinityGroup.Agent) =>
-        logger.debug("Client authorisation succeeded as fully-authorised agent.")
+        Logger.debug("Client authorisation succeeded as fully-authorised agent.")
         Future.successful(Right(Agent))
       case _ =>
-        logger.debug("Client authorisation succeeded as fully-authorised individual.")
+        Logger.debug("Client authorisation succeeded as fully-authorised individual.")
         Future.successful(Right(Individual))
     } recoverWith (authoriseAsFOA orElse unhandledError)
   }
@@ -68,10 +64,10 @@ object AuthenticationService extends AuthorisedFunctions {
     case _: InsufficientEnrolments =>
       authorised(AffinityGroup.Agent and Enrolment("HMRC-AS-AGENT")) { // If the user is an agent are they enrolled in Agent Services?
         if (reqHeader.method == "GET") {
-          logger.debug("Client authorisation failed. Attempt to GET as a filing-only agent.")
+          Logger.debug("Client authorisation failed. Attempt to GET as a filing-only agent.")
           Future.successful(Left(Forbidden(Json.toJson(Errors.AgentNotAuthorized))))
         } else {
-          logger.debug("Client authorisation succeeded as filing-only agent.")
+          Logger.debug("Client authorisation succeeded as filing-only agent.")
           Future.successful(Right(FilingOnlyAgent))
         }
       } recoverWith (unsubscribedAgentOrUnauthorisedClient orElse unhandledError) // Iff agent is not enrolled for the user or client affinityGroup is not Agent.
@@ -79,10 +75,10 @@ object AuthenticationService extends AuthorisedFunctions {
 
   private def unsubscribedAgentOrUnauthorisedClient: PartialFunction[Throwable, Future[AuthResult]] = {
     case _: InsufficientEnrolments =>
-      logger.debug(s"Authorisation failed as filing-only agent.")
+      Logger.debug(s"Authorisation failed as filing-only agent.")
       Future.successful(Left(Forbidden(Json.toJson(Errors.AgentNotSubscribed))))
     case _: UnsupportedAffinityGroup =>
-      logger.debug(s"Authorisation failed as client.")
+      Logger.debug(s"Authorisation failed as client.")
       Future.successful(Left(Forbidden(Json.toJson(Errors.ClientNotSubscribed))))
   }
 
@@ -93,16 +89,16 @@ object AuthenticationService extends AuthorisedFunctions {
 
     locally { // http://www.scala-lang.org/old/node/3594
       case e @ (_: AuthorisationException | Upstream5xxResponse(regex(_ *), _, _)) =>
-        logger.error(s"Authorisation failed with unexpected exception. Bad token? Exception: [$e]")
+        Logger.error(s"Authorisation failed with unexpected exception. Bad token? Exception: [$e]")
         Future.successful(Left(Forbidden(Json.toJson(Errors.BadToken))))
       case e: Upstream4xxResponse =>
-        logger.error(s"Unhandled 4xx response from play-auth: [$e]. Returning 500 to client.")
+        Logger.error(s"Unhandled 4xx response from play-auth: [$e]. Returning 500 to client.")
         internalServerError
       case e: Upstream5xxResponse =>
-        logger.error(s"Unhandled 5xx response from play-auth: [$e]. Returning 500 to client.")
+        Logger.error(s"Unhandled 5xx response from play-auth: [$e]. Returning 500 to client.")
         internalServerError
       case NonFatal(e) =>
-        logger.error(s"Unhandled non-fatal exception from play-auth: [$e]. Returning 500 to client.")
+        Logger.error(s"Unhandled non-fatal exception from play-auth: [$e]. Returning 500 to client.")
         internalServerError
     }
   }

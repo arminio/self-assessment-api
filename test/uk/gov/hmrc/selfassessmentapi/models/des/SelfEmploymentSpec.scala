@@ -19,7 +19,7 @@ package uk.gov.hmrc.selfassessmentapi.models.des
 import org.joda.time.LocalDate
 import uk.gov.hmrc.selfassessmentapi.models
 import uk.gov.hmrc.selfassessmentapi.models.AccountingType.AccountingType
-import uk.gov.hmrc.selfassessmentapi.models.{AccountingPeriod, AccountingType}
+import uk.gov.hmrc.selfassessmentapi.models.{AccountingPeriod, AccountingType, Transform}
 import uk.gov.hmrc.selfassessmentapi.resources.JsonSpec
 
 class SelfEmploymentSpec extends JsonSpec {
@@ -42,7 +42,10 @@ class SelfEmploymentSpec extends JsonSpec {
   "constructing a DES SelfEmployment using our API SelfEmployment" should {
     "correctly map fields" in {
       val desSelfEmployment =
-        Business.from(apiSelfEmployment(accountingType = AccountingType.CASH)).businessDetails.head
+        Transform[models.selfemployment.SelfEmployment, Business]
+          .from(apiSelfEmployment(accountingType = AccountingType.CASH))
+          .businessDetails
+          .head
 
       desSelfEmployment.accountingPeriodStartDate shouldBe "2017-04-01"
       desSelfEmployment.accountingPeriodEndDate shouldBe "2017-04-02"
@@ -59,7 +62,8 @@ class SelfEmploymentSpec extends JsonSpec {
     }
 
     "correctly map the accrual accounting type" in {
-      val desBusiness = Business.from(apiSelfEmployment(accountingType = AccountingType.ACCRUAL))
+      val desBusiness = Transform[models.selfemployment.SelfEmployment, Business]
+        .from(apiSelfEmployment(accountingType = AccountingType.ACCRUAL))
 
       desBusiness.businessDetails.head.cashOrAccruals shouldBe "accruals"
     }

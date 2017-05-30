@@ -37,7 +37,8 @@ private object AppDependencies {
     "uk.gov.hmrc" %% "play-hmrc-api" % "1.4.0",
     "uk.gov.hmrc" %% "play-hal" % "1.2.0",
     "uk.gov.hmrc" %% "play-scheduling" % "4.0.0",
-    "ai.x" %% "play-json-extensions" % "0.8.0"
+    "ai.x" %% "play-json-extensions" % "0.8.0",
+    "org.typelevel" %% "cats" % "0.9.0"
   )
 
   trait TestDependencies {

@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.selfassessmentapi.resources
 
+import cats.data.Reader
 import play.api.Logger
 import play.api.mvc.{ActionBuilder, _}
 import uk.gov.hmrc.domain.Nino
@@ -28,18 +29,69 @@ import uk.gov.hmrc.selfassessmentapi.services.AuthenticationService
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-trait BaseResource extends BaseController {
+trait Actions2 extends BaseController {
+  val sourceType: SourceType
+  val summary = None
 
-  protected lazy val baseUrl: String = AppContext.desUrl
+  val logger: Logger = Logger(this.getClass)
+
+  lazy val actionConfig =
+    ActionConfig(
+      featureSwitchConfig = FeatureSwitchConfig(FeatureSwitch(AppContext.featureSwitch)),
+      authConfig =
+        AuthConfig(authService = new AuthenticationService {}, authEnabled = AppContext.authEnabled))
+
+  def AuthAction(nino: Nino): Reader[AuthConfig, ActionRefiner[Request, AuthRequest]] =
+    Reader(authConfig =>
+      new ActionRefiner[Request, AuthRequest] {
+        override protected def refine[A](request: Request[A]): Future[Either[Result, AuthRequest[A]]] =
+          if (authConfig.authEnabled) {
+            implicit val ev: Request[A] = request
+            authConfig.authService.authCheck(nino) map {
+              case Right(authContext) => Right(new AuthRequest(authContext, request))
+              case Left(authError) => Left(authError)
+            }
+          } else Future.successful(Right(new AuthRequest(Individual, request)))
+    })
+
+  def FeatureSwitchAction(
+      source: SourceType,
+      summary: Option[String] = None): Reader[FeatureSwitchConfig, ActionBuilder[Request] with ActionFilter[Request]] =
+    Reader(featureSwitchConfig =>
+      new ActionBuilder[Request] with ActionFilter[Request] {
+        override protected def filter[A](request: Request[A]): Future[Option[Result]] =
+          Future {
+            if (featureSwitchConfig.featureSwitch.isEnabled(source, summary)) None
+            else Some(NotFound)
+          }
+    })
+
+  def APIAction(nino: Nino,
+                source: SourceType,
+                summary: Option[String] = None): Reader[ActionConfig, ActionBuilder[AuthRequest]] =
+    Reader(
+      actionConfig =>
+        FeatureSwitchAction(source, summary).run(actionConfig.featureSwitchConfig)
+          andThen AuthAction(nino).run(actionConfig.authConfig))
+}
+
+class AuthRequest[A](val authContext: AuthContext, request: Request[A]) extends WrappedRequest[A](request)
+
+case class AuthConfig(authService: AuthenticationService, authEnabled: Boolean)
+case class FeatureSwitchConfig(featureSwitch: FeatureSwitch)
+case class ActionConfig(authConfig: AuthConfig, featureSwitchConfig: FeatureSwitchConfig)
+
+// FIXME temporarily keep this trait so the rest of the controllers compile
+trait Actions extends BaseController {
 
   val sourceType: SourceType
   val summary = None
 
   val logger: Logger = Logger(this.getClass)
 
-  private val authService = AuthenticationService
   private lazy val authIsEnabled = AppContext.authEnabled
   private lazy val featureSwitch = FeatureSwitch(AppContext.featureSwitch)
+  lazy val authService = new AuthenticationService {}
 
   def AuthAction(nino: Nino) = new ActionRefiner[Request, AuthRequest] {
     override protected def refine[A](request: Request[A]): Future[Either[Result, AuthRequest[A]]] =
@@ -64,5 +116,3 @@ trait BaseResource extends BaseController {
   def APIAction(nino: Nino, source: SourceType, summary: Option[String] = None): ActionBuilder[AuthRequest] =
     FeatureSwitchAction(source, summary) andThen AuthAction(nino)
 }
-
-class AuthRequest[A](val authContext: AuthContext, request: Request[A]) extends WrappedRequest[A](request)
