@@ -34,12 +34,18 @@ case class TaxCalculationResponse(underlying: HttpResponse) extends Response {
 
   def calculation: Option[TaxCalculation] = {
     (json \ "calcResult" \ "calcDetail").asOpt[des.TaxCalculation] match {
-      case x @ Some(_) => x
+      case x @ Some(_) => updateIncomeTax(x)
       case None => {
         logger.error("The 'calcDetail' field was not found in the response from DES")
         None
       }
     }
+  }
+
+  def updateIncomeTax(calc: Option[TaxCalculation]): Option[TaxCalculation] = {
+    val incomeTaxYTD = (json \ "calcResult" \ "incomeTaxYTD").as[BigDecimal]
+    val incomeTaxThisPeriod = (json \ "calcResult" \ "incomeTaxYTD").as[BigDecimal]
+    Some(calc.get.copy(incomeTaxYTD = Some(incomeTaxYTD), incomeTaxThisPeriod = Some(incomeTaxThisPeriod)))
   }
 
   def isInvalidCalcId: Boolean =

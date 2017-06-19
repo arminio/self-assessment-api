@@ -19,7 +19,9 @@ package uk.gov.hmrc.selfassessmentapi.models.des
 import ai.x.play.json.Jsonx
 import play.api.libs.json._
 
-case class TaxCalculation(profitFromSelfEmployment: Option[BigDecimal],
+case class TaxCalculation(incomeTaxYTD: Option[BigDecimal],
+                          incomeTaxThisPeriod: Option[BigDecimal],
+                          profitFromSelfEmployment: Option[BigDecimal],
                           profitFromUkLandAndProperty: Option[BigDecimal],
                           interestReceivedFromUkBanksAndBuildingSocieties: Option[BigDecimal],
                           dividendsFromUkCompanies: Option[BigDecimal],
